@@ -29,6 +29,8 @@
     background:var(--paper);
     color:var(--ink);
     min-height:100vh;
+    min-width:220px;
+    overflow-x:hidden;
     -webkit-font-smoothing:antialiased;
   }
   .mono{font-family:'JetBrains Mono',ui-monospace,monospace;}
@@ -92,11 +94,11 @@
   }
 
   /* ---------- App shell ---------- */
-  #appScreen{display:none; max-width:640px; margin:0 auto; padding-bottom:100px;}
+  #appScreen{display:none; max-width:640px; width:100%; margin:0 auto; padding-bottom:100px;}
   header{
     position:sticky; top:0; z-index:10;
     background:var(--paper);
-    padding:18px 16px 10px;
+    padding:clamp(10px,4vw,18px) clamp(10px,4vw,16px) 10px;
     border-bottom:1px solid var(--line);
   }
   .headRow{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
@@ -133,7 +135,7 @@
   }
   .chip.active{background:var(--ink); color:#fff; border-color:var(--ink);}
 
-  #list{padding:14px 16px; display:flex; flex-direction:column; gap:10px;}
+  #list{padding:14px clamp(8px,4vw,16px); display:flex; flex-direction:column; gap:10px;}
   .empty{
     text-align:center;
     color:var(--ink-soft);
@@ -150,6 +152,16 @@
     display:flex;
     gap:12px;
     cursor:pointer;
+    transition:transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    touch-action:pan-y;
+    user-select:none;
+  }
+  .memo.dragging{
+    box-shadow:0 10px 24px rgba(0,0,0,0.18);
+    transform:scale(1.03);
+    opacity:0.95;
+    z-index:5;
+    position:relative;
   }
   .memo.completed .memoTitle, .memo.completed .memoPreview{
     opacity:0.45; text-decoration:line-through;
@@ -167,27 +179,16 @@
   .checkbox.checked{background:var(--teal); border-color:var(--teal);}
   .memoBody{flex:1; min-width:0;}
   .memoTop{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
-  .titleWrap{position:relative; display:inline-block;}
   .memoTitle{
     font-size:15px; font-weight:600; margin:0;
-    position:relative; z-index:1;
     letter-spacing:-0.01em;
   }
-  .pin-highlight .memoTitle::before{
-    content:"";
-    position:absolute;
-    left:-3px; right:-3px; bottom:1px; height:9px;
-    background:var(--accent);
-    opacity:0.55;
-    transform:rotate(-1deg);
-    z-index:-1;
-    border-radius:3px;
+  .memoDate{
+    flex:none;
+    font-size:11px;
+    color:var(--ink-soft);
+    padding-top:2px;
   }
-  .pinBtn{
-    background:none; border:none; cursor:pointer;
-    color:var(--line); flex:none; padding:2px;
-  }
-  .pinBtn.active{color:var(--accent);}
   .memoPreview{
     font-size:13px; color:var(--ink-soft);
     margin:4px 0 8px;
@@ -335,7 +336,6 @@ let memos = [];
 let activeFilter = '전체';
 let searchTerm = '';
 let editingId = null;
-let editingPinned = false;
 let selectedCategory = CATEGORIES[0];
 let currentUser = null;
 let channel = null;
@@ -425,7 +425,7 @@ async function loadMemos() {
   const { data, error } = await supabase
     .from('memos')
     .select('*')
-    .order('pinned', { ascending: false })
+    .order('position', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false });
   if (error) { console.error(error); return; }
   memos = data || [];
@@ -445,7 +445,7 @@ async function saveMemo() {
   } else {
     await supabase.from('memos').insert({
       title, content, category: selectedCategory,
-      pinned: false, completed: false, user_id: currentUser.id
+      completed: false, user_id: currentUser.id, position: Date.now()
     });
   }
   closeSheet();
@@ -459,12 +459,6 @@ async function deleteMemo() {
   loadMemos();
 }
 
-async function togglePin(memo, ev) {
-  ev.stopPropagation();
-  await supabase.from('memos').update({ pinned: !memo.pinned }).eq('id', memo.id);
-  loadMemos();
-}
-
 async function toggleComplete(memo, ev) {
   ev.stopPropagation();
   await supabase.from('memos').update({ completed: !memo.completed }).eq('id', memo.id);
@@ -473,7 +467,7 @@ async function toggleComplete(memo, ev) {
 
 // ---------- Render ----------
 function renderChips() {
-  const cats = ['전체', '핀고정', ...CATEGORIES];
+  const cats = ['전체', ...CATEGORIES];
   $('chips').innerHTML = cats.map(c =>
     `<button class="chip ${activeFilter === c ? 'active' : ''}" data-cat="${c}">${c}</button>`
   ).join('');
@@ -484,8 +478,7 @@ function renderChips() {
 
 function renderList() {
   let filtered = memos;
-  if (activeFilter === '핀고정') filtered = filtered.filter(m => m.pinned);
-  else if (activeFilter !== '전체') filtered = filtered.filter(m => m.category === activeFilter);
+  if (activeFilter !== '전체') filtered = filtered.filter(m => m.category === activeFilter);
   if (searchTerm) {
     const t = searchTerm.toLowerCase();
     filtered = filtered.filter(m => (m.title || '').toLowerCase().includes(t) || (m.content || '').toLowerCase().includes(t));
@@ -505,34 +498,112 @@ function renderList() {
       </div>
       <div class="memoBody">
         <div class="memoTop">
-          <div class="titleWrap ${m.pinned ? 'pin-highlight' : ''}">
-            <p class="memoTitle">${escapeHtml(m.title || '(제목 없음)')}</p>
-          </div>
-          <button class="pinBtn ${m.pinned ? 'active' : ''}" data-action="pin" data-id="${m.id}">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="${m.pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M12 17v5"/><path d="M9 3h6l1 6 3 3v2H5v-2l3-3z"/></svg>
-          </button>
+          <p class="memoTitle">${escapeHtml(m.title || '(제목 없음)')}</p>
+          <span class="memoDate mono">${formatDate(m.created_at)}</span>
         </div>
         <p class="memoPreview">${escapeHtml(m.content || '')}</p>
         <div class="memoMeta">
           <span class="catTag">${m.category || '일반'}</span>
-          <span class="mono">${formatDate(m.created_at)}</span>
         </div>
       </div>
     </div>
   `).join('');
 
+  const canReorder = activeFilter === '전체' && !searchTerm;
+
   $('list').querySelectorAll('.memo').forEach(el => {
     el.addEventListener('click', (ev) => {
       if (ev.target.closest('[data-action]')) return;
+      if (el.dataset.justDragged) { delete el.dataset.justDragged; return; }
       openSheet(memos.find(m => m.id === el.dataset.id));
     });
-  });
-  $('list').querySelectorAll('[data-action="pin"]').forEach(el => {
-    el.addEventListener('click', (ev) => togglePin(memos.find(m => m.id === el.dataset.id), ev));
+    if (canReorder) attachDrag(el);
   });
   $('list').querySelectorAll('[data-action="check"]').forEach(el => {
     el.addEventListener('click', (ev) => toggleComplete(memos.find(m => m.id === el.dataset.id), ev));
   });
+}
+
+// ---------- Long-press drag reorder ----------
+function attachDrag(el) {
+  let pressTimer = null;
+  let dragging = false;
+  let startY = 0;
+  let moved = false;
+
+  el.addEventListener('pointerdown', (ev) => {
+    if (ev.target.closest('[data-action]')) return;
+    startY = ev.clientY;
+    moved = false;
+    pressTimer = setTimeout(() => {
+      dragging = true;
+      el.classList.add('dragging');
+      el.setPointerCapture(ev.pointerId);
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, 450);
+  });
+
+  el.addEventListener('pointermove', (ev) => {
+    if (Math.abs(ev.clientY - startY) > 8) moved = true;
+    if (!dragging) {
+      if (moved && pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      return;
+    }
+    ev.preventDefault();
+    const list = $('list');
+    const siblings = [...list.querySelectorAll('.memo:not(.dragging)')];
+    for (const sib of siblings) {
+      const rect = sib.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      if (ev.clientY < midY && sib.previousElementSibling !== el) {
+        animateReorder(() => list.insertBefore(el, sib));
+        break;
+      } else if (ev.clientY >= midY && sib.nextElementSibling !== el && sib === siblings[siblings.length - 1]) {
+        animateReorder(() => list.insertBefore(el, sib.nextSibling));
+      }
+    }
+  });
+
+  function endDrag(ev) {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    el.dataset.justDragged = '1';
+    persistOrder();
+  }
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', endDrag);
+}
+
+function animateReorder(mutate) {
+  const list = $('list');
+  const items = [...list.querySelectorAll('.memo')];
+  const firstRects = new Map(items.map(it => [it, it.getBoundingClientRect()]));
+  mutate();
+  const newItems = [...list.querySelectorAll('.memo')];
+  newItems.forEach(it => {
+    const first = firstRects.get(it);
+    if (!first) return;
+    const last = it.getBoundingClientRect();
+    const dy = first.top - last.top;
+    if (dy) {
+      it.style.transition = 'none';
+      it.style.transform = `translateY(${dy}px)`;
+      requestAnimationFrame(() => {
+        it.style.transition = 'transform 0.2s ease';
+        it.style.transform = '';
+      });
+    }
+  });
+}
+
+async function persistOrder() {
+  const ids = [...$('list').querySelectorAll('.memo')].map(el => el.dataset.id);
+  await Promise.all(ids.map((id, index) =>
+    supabase.from('memos').update({ position: index }).eq('id', id)
+  ));
+  memos.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
 }
 
 function escapeHtml(s) {
