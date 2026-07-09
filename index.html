@@ -538,6 +538,7 @@ function attachDrag(el) {
     pressTimer = setTimeout(() => {
       dragging = true;
       el.classList.add('dragging');
+      el.style.touchAction = 'none';
       el.setPointerCapture(ev.pointerId);
       if (navigator.vibrate) navigator.vibrate(15);
     }, 450);
@@ -552,15 +553,18 @@ function attachDrag(el) {
     ev.preventDefault();
     const list = $('list');
     const siblings = [...list.querySelectorAll('.memo:not(.dragging)')];
+    let target = null;
     for (const sib of siblings) {
       const rect = sib.getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
-      if (ev.clientY < midY && sib.previousElementSibling !== el) {
-        animateReorder(() => list.insertBefore(el, sib));
-        break;
-      } else if (ev.clientY >= midY && sib.nextElementSibling !== el && sib === siblings[siblings.length - 1]) {
-        animateReorder(() => list.insertBefore(el, sib.nextSibling));
+      if (ev.clientY < midY) { target = sib; break; }
+    }
+    if (target) {
+      if (target.previousElementSibling !== el) {
+        animateReorder(() => list.insertBefore(el, target));
       }
+    } else if (list.lastElementChild !== el) {
+      animateReorder(() => list.appendChild(el));
     }
   });
 
@@ -569,6 +573,7 @@ function attachDrag(el) {
     if (!dragging) return;
     dragging = false;
     el.classList.remove('dragging');
+    el.style.touchAction = '';
     el.dataset.justDragged = '1';
     persistOrder();
   }
