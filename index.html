@@ -539,43 +539,41 @@ function renderList() {
 
 // ---------- Handle-based drag reorder ----------
 function attachDrag(handle, el) {
-  let dragging = false;
-
   handle.addEventListener('pointerdown', (ev) => {
     ev.preventDefault();
-    dragging = true;
     el.classList.add('dragging');
-    handle.setPointerCapture(ev.pointerId);
-  });
 
-  handle.addEventListener('pointermove', (ev) => {
-    if (!dragging) return;
-    ev.preventDefault();
-    const list = $('list');
-    const siblings = [...list.querySelectorAll('.memo:not(.dragging)')];
-    let target = null;
-    for (const sib of siblings) {
-      const rect = sib.getBoundingClientRect();
-      const midY = rect.top + rect.height / 2;
-      if (ev.clientY < midY) { target = sib; break; }
-    }
-    if (target) {
-      if (target.previousElementSibling !== el) {
-        animateReorder(() => list.insertBefore(el, target));
+    const onMove = (moveEv) => {
+      moveEv.preventDefault();
+      const list = $('list');
+      const siblings = [...list.querySelectorAll('.memo:not(.dragging)')];
+      let target = null;
+      for (const sib of siblings) {
+        const rect = sib.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (moveEv.clientY < midY) { target = sib; break; }
       }
-    } else if (list.lastElementChild !== el) {
-      animateReorder(() => list.appendChild(el));
-    }
-  });
+      if (target) {
+        if (target.previousElementSibling !== el) {
+          animateReorder(() => list.insertBefore(el, target));
+        }
+      } else if (list.lastElementChild !== el) {
+        animateReorder(() => list.appendChild(el));
+      }
+    };
 
-  function endDrag() {
-    if (!dragging) return;
-    dragging = false;
-    el.classList.remove('dragging');
-    persistOrder();
-  }
-  handle.addEventListener('pointerup', endDrag);
-  handle.addEventListener('pointercancel', endDrag);
+    const onUp = () => {
+      el.classList.remove('dragging');
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+      persistOrder();
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  });
 }
 
 function animateReorder(mutate) {
