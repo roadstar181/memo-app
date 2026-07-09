@@ -276,9 +276,11 @@
 <div id="authScreen">
   <div class="authCard">
     <h1>메모장</h1>
-    <p>이메일로 로그인 링크를 받아<br/>모든 기기에서 메모를 동기화하세요.</p>
+    <p>이메일과 비밀번호로 로그인하면<br/>모든 기기에서 메모를 동기화하세요.</p>
     <input id="emailInput" type="email" placeholder="이메일 주소" autocomplete="email" />
-    <button class="btn" id="sendLinkBtn">로그인 링크 받기</button>
+    <input id="passwordInput" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password" />
+    <button class="btn" id="loginBtn">로그인</button>
+    <button class="btn btnGhost" id="signupBtn" style="margin-top:8px;">처음이신가요? 회원가입</button>
     <div class="authMsg" id="authMsg"></div>
   </div>
 </div>
@@ -322,8 +324,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // ⚠️ 아래 두 값을 Supabase 프로젝트 정보로 교체하세요.
-const SUPABASE_URL = 'https://yfmpxrtjoizezzmtewus.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_LOuVLVh2COX0GOwnU3r1ew_w0FEB-3e';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -340,17 +342,43 @@ let channel = null;
 
 const $ = (id) => document.getElementById(id);
 
+function deriveTitle(content) {
+  if (!content) return '';
+  const firstLine = content.split('\n').find(l => l.trim().length > 0) || '';
+  return firstLine.trim().slice(0, 40);
+}
+
+function updateTitlePlaceholder() {
+  if (!$('titleInput').value) {
+    $('titleInput').placeholder = deriveTitle($('contentInput').value) || '제목';
+  }
+}
+
 // ---------- Auth ----------
-$('sendLinkBtn').addEventListener('click', async () => {
+$('loginBtn').addEventListener('click', async () => {
   const email = $('emailInput').value.trim();
-  if (!email) return;
-  $('sendLinkBtn').disabled = true;
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.href }
-  });
-  $('sendLinkBtn').disabled = false;
-  $('authMsg').textContent = error ? '오류: ' + error.message : '이메일을 확인해 링크를 클릭하세요.';
+  const password = $('passwordInput').value;
+  if (!email || !password) { $('authMsg').textContent = '이메일과 비밀번호를 입력하세요.'; return; }
+  $('loginBtn').disabled = true;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  $('loginBtn').disabled = false;
+  if (error) $('authMsg').textContent = '오류: ' + error.message;
+});
+
+$('signupBtn').addEventListener('click', async () => {
+  const email = $('emailInput').value.trim();
+  const password = $('passwordInput').value;
+  if (!email || !password) { $('authMsg').textContent = '이메일과 비밀번호를 입력하세요.'; return; }
+  if (password.length < 6) { $('authMsg').textContent = '비밀번호는 6자 이상이어야 해요.'; return; }
+  $('signupBtn').disabled = true;
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  $('signupBtn').disabled = false;
+  if (error) { $('authMsg').textContent = '오류: ' + error.message; return; }
+  if (data.session) {
+    $('authMsg').textContent = '회원가입 완료! 로그인 중...';
+  } else {
+    $('authMsg').textContent = '가입 확인 이메일을 보냈어요. 메일함을 확인해주세요.';
+  }
 });
 
 $('logoutBtn').addEventListener('click', async () => {
@@ -406,8 +434,8 @@ async function loadMemos() {
 }
 
 async function saveMemo() {
-  const title = $('titleInput').value.trim();
   const content = $('contentInput').value.trim();
+  const title = $('titleInput').value.trim() || deriveTitle(content);
   if (!title && !content) return;
 
   if (editingId) {
@@ -533,8 +561,9 @@ function openSheet(memo) {
   selectedCategory = memo ? (memo.category || CATEGORIES[0]) : CATEGORIES[0];
   $('deleteBtn').style.display = memo ? 'block' : 'none';
   renderCatRow();
+  updateTitlePlaceholder();
   $('overlay').classList.add('show');
-  setTimeout(() => $('titleInput').focus(), 100);
+  setTimeout(() => $('contentInput').focus(), 100);
 }
 
 function closeSheet() {
@@ -548,6 +577,7 @@ $('overlay').addEventListener('click', (e) => { if (e.target.id === 'overlay') c
 $('saveBtn').addEventListener('click', saveMemo);
 $('deleteBtn').addEventListener('click', deleteMemo);
 $('searchInput').addEventListener('input', (e) => { searchTerm = e.target.value; renderList(); });
+$('contentInput').addEventListener('input', updateTitlePlaceholder);
 
 // ---------- PWA ----------
 if ('serviceWorker' in navigator) {
