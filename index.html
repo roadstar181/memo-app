@@ -148,12 +148,12 @@
     background:var(--card);
     border:1px solid var(--line);
     border-radius:var(--radius);
-    padding:14px 14px 12px;
+    padding:14px 10px 12px 14px;
     display:flex;
-    gap:12px;
+    align-items:stretch;
+    gap:8px;
     cursor:pointer;
     transition:transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-    touch-action:pan-y;
     user-select:none;
   }
   .memo.dragging{
@@ -163,6 +163,17 @@
     z-index:5;
     position:relative;
   }
+  .dragHandle{
+    flex:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:28px;
+    color:var(--line);
+    cursor:grab;
+    touch-action:none;
+  }
+  .dragHandle:active{cursor:grabbing; color:var(--ink-soft);}
   .memo.completed .memoTitle, .memo.completed .memoPreview{
     opacity:0.45; text-decoration:line-through;
   }
@@ -489,6 +500,9 @@ function renderList() {
     return;
   }
 
+  const canReorder = activeFilter === '전체' && !searchTerm;
+  const handleSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.6"/><circle cx="16" cy="6" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>`;
+
   $('list').innerHTML = filtered.map(m => `
     <div class="memo ${m.completed ? 'completed' : ''}" data-id="${m.id}">
       <div class="checkWrap">
@@ -506,50 +520,36 @@ function renderList() {
           <span class="catTag">${m.category || '일반'}</span>
         </div>
       </div>
+      ${canReorder ? `<div class="dragHandle" data-action="drag">${handleSvg}</div>` : ''}
     </div>
   `).join('');
-
-  const canReorder = activeFilter === '전체' && !searchTerm;
 
   $('list').querySelectorAll('.memo').forEach(el => {
     el.addEventListener('click', (ev) => {
       if (ev.target.closest('[data-action]')) return;
-      if (el.dataset.justDragged) { delete el.dataset.justDragged; return; }
       openSheet(memos.find(m => m.id === el.dataset.id));
     });
-    if (canReorder) attachDrag(el);
+    const handle = el.querySelector('.dragHandle');
+    if (handle) attachDrag(handle, el);
   });
   $('list').querySelectorAll('[data-action="check"]').forEach(el => {
     el.addEventListener('click', (ev) => toggleComplete(memos.find(m => m.id === el.dataset.id), ev));
   });
 }
 
-// ---------- Long-press drag reorder ----------
-function attachDrag(el) {
-  let pressTimer = null;
+// ---------- Handle-based drag reorder ----------
+function attachDrag(handle, el) {
   let dragging = false;
-  let startY = 0;
-  let moved = false;
 
-  el.addEventListener('pointerdown', (ev) => {
-    if (ev.target.closest('[data-action]')) return;
-    startY = ev.clientY;
-    moved = false;
-    pressTimer = setTimeout(() => {
-      dragging = true;
-      el.classList.add('dragging');
-      el.style.touchAction = 'none';
-      el.setPointerCapture(ev.pointerId);
-      if (navigator.vibrate) navigator.vibrate(15);
-    }, 450);
+  handle.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    dragging = true;
+    el.classList.add('dragging');
+    handle.setPointerCapture(ev.pointerId);
   });
 
-  el.addEventListener('pointermove', (ev) => {
-    if (Math.abs(ev.clientY - startY) > 8) moved = true;
-    if (!dragging) {
-      if (moved && pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-      return;
-    }
+  handle.addEventListener('pointermove', (ev) => {
+    if (!dragging) return;
     ev.preventDefault();
     const list = $('list');
     const siblings = [...list.querySelectorAll('.memo:not(.dragging)')];
@@ -568,17 +568,14 @@ function attachDrag(el) {
     }
   });
 
-  function endDrag(ev) {
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+  function endDrag() {
     if (!dragging) return;
     dragging = false;
     el.classList.remove('dragging');
-    el.style.touchAction = '';
-    el.dataset.justDragged = '1';
     persistOrder();
   }
-  el.addEventListener('pointerup', endDrag);
-  el.addEventListener('pointercancel', endDrag);
+  handle.addEventListener('pointerup', endDrag);
+  handle.addEventListener('pointercancel', endDrag);
 }
 
 function animateReorder(mutate) {
