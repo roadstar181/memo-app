@@ -120,22 +120,8 @@
     font-family:inherit;
   }
   .searchWrap svg{position:absolute; left:11px; top:50%; transform:translateY(-50%); opacity:0.4;}
-  .chips{display:flex; gap:6px; overflow-x:auto; margin-top:12px; padding-bottom:2px;}
-  .chip{
-    flex:none;
-    padding:6px 12px;
-    border-radius:999px;
-    background:var(--card);
-    border:1px solid var(--line);
-    font-size:12.5px;
-    color:var(--ink-soft);
-    cursor:pointer;
-    white-space:nowrap;
-    font-family:inherit;
-  }
-  .chip.active{background:var(--ink); color:#fff; border-color:var(--ink);}
 
-  #list{padding:14px clamp(8px,4vw,16px); display:flex; flex-direction:column; gap:10px;}
+  #list{padding:14px clamp(8px,4vw,16px); display:flex; flex-direction:column; gap:14px;}
   .empty{
     text-align:center;
     color:var(--ink-soft);
@@ -145,9 +131,9 @@
   }
 
   .memo{
-    background:var(--card);
-    border:1px solid var(--line);
-    border-radius:var(--radius);
+    background:#FFE477;
+    border-radius:0;
+    box-shadow:3px 4px 8px rgba(0,0,0,0.14);
     padding:14px 10px 12px 14px;
     display:flex;
     align-items:stretch;
@@ -157,7 +143,7 @@
     user-select:none;
   }
   .memo.dragging{
-    box-shadow:0 10px 24px rgba(0,0,0,0.18);
+    box-shadow:0 10px 24px rgba(0,0,0,0.24);
     transform:scale(1.03);
     opacity:0.95;
     z-index:5;
@@ -169,25 +155,11 @@
     align-items:center;
     justify-content:center;
     width:28px;
-    color:var(--line);
+    color:rgba(36,35,31,0.35);
     cursor:grab;
     touch-action:none;
   }
-  .dragHandle:active{cursor:grabbing; color:var(--ink-soft);}
-  .memo.completed .memoTitle, .memo.completed .memoPreview{
-    opacity:0.45; text-decoration:line-through;
-  }
-  .checkWrap{padding-top:2px;}
-  .checkbox{
-    width:19px; height:19px;
-    border:1.5px solid var(--line);
-    border-radius:6px;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-    flex:none;
-    background:var(--card);
-  }
-  .checkbox.checked{background:var(--teal); border-color:var(--teal);}
+  .dragHandle:active{cursor:grabbing; color:rgba(36,35,31,0.55);}
   .memoBody{flex:1; min-width:0;}
   .memoTop{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
   .memoTitle{
@@ -197,25 +169,17 @@
   .memoDate{
     flex:none;
     font-size:11px;
-    color:var(--ink-soft);
+    color:rgba(36,35,31,0.55);
     padding-top:2px;
   }
   .memoPreview{
-    font-size:13px; color:var(--ink-soft);
-    margin:4px 0 8px;
+    font-size:13px; color:rgba(36,35,31,0.7);
+    margin:4px 0 0;
     overflow:hidden;
     display:-webkit-box;
-    -webkit-line-clamp:2;
+    -webkit-line-clamp:3;
     -webkit-box-orient:vertical;
     line-height:1.5;
-  }
-  .memoMeta{display:flex; align-items:center; gap:8px; font-size:11px; color:var(--ink-soft);}
-  .catTag{
-    background:rgba(79,120,105,0.12);
-    color:var(--teal);
-    padding:2px 8px;
-    border-radius:999px;
-    font-weight:600;
   }
 
   /* ---------- FAB ---------- */
@@ -271,13 +235,12 @@
     outline:none; background:var(--paper); padding:10px;
   }
   #contentInput:focus{border-color:var(--accent);}
-  .catRow{display:flex; gap:6px; flex-wrap:wrap; margin:12px 0 18px;}
-  .catPick{
-    padding:6px 12px; border-radius:999px; border:1px solid var(--line);
-    font-size:12.5px; background:var(--paper); cursor:pointer; color:var(--ink-soft);
-    font-family:inherit;
+  .colorRow{display:flex; gap:12px; margin:14px 0 18px;}
+  .colorPick{
+    width:30px; height:30px; border-radius:50%;
+    border:2px solid transparent; cursor:pointer; padding:0;
   }
-  .catPick.active{background:var(--teal); border-color:var(--teal); color:#fff;}
+  .colorPick.active{border-color:var(--ink);}
   .sheetActions{display:flex; gap:8px;}
   .sheetActions .btn{flex:1;}
   .btnDanger{background:var(--danger);}
@@ -310,7 +273,6 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
       <input id="searchInput" placeholder="메모 검색" />
     </div>
-    <div class="chips" id="chips"></div>
   </header>
   <div id="list"></div>
 </div>
@@ -326,7 +288,7 @@
     </div>
     <input id="titleInput" placeholder="제목" />
     <textarea id="contentInput" placeholder="내용을 입력하세요..."></textarea>
-    <div class="catRow" id="catRow"></div>
+    <div class="colorRow" id="colorRow"></div>
     <div class="sheetActions">
       <button class="btn btnDanger" id="deleteBtn" style="display:none;">삭제</button>
       <button class="btn" id="saveBtn">저장</button>
@@ -343,13 +305,12 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const CATEGORIES = ['일반', '업무', '아이디어', '중요'];
+const COLORS = ['#FFE477', '#FFB6C7', '#AEE1FF', '#C6F1C0', '#FFCB91'];
 
 let memos = [];
-let activeFilter = '전체';
 let searchTerm = '';
 let editingId = null;
-let selectedCategory = CATEGORIES[0];
+let selectedColor = COLORS[0];
 let currentUser = null;
 let channel = null;
 
@@ -442,7 +403,6 @@ async function loadMemos() {
     .order('created_at', { ascending: false });
   if (error) { console.error(error); return; }
   memos = data || [];
-  renderChips();
   renderList();
 }
 
@@ -453,12 +413,12 @@ async function saveMemo() {
 
   if (editingId) {
     await supabase.from('memos').update({
-      title, content, category: selectedCategory, updated_at: new Date().toISOString()
+      title, content, color: selectedColor, updated_at: new Date().toISOString()
     }).eq('id', editingId);
   } else {
     await supabase.from('memos').insert({
-      title, content, category: selectedCategory,
-      completed: false, user_id: currentUser.id, position: Date.now()
+      title, content, color: selectedColor,
+      user_id: currentUser.id, position: Date.now()
     });
   }
   closeSheet();
@@ -472,26 +432,9 @@ async function deleteMemo() {
   loadMemos();
 }
 
-async function toggleComplete(memo, ev) {
-  ev.stopPropagation();
-  await supabase.from('memos').update({ completed: !memo.completed }).eq('id', memo.id);
-  loadMemos();
-}
-
 // ---------- Render ----------
-function renderChips() {
-  const cats = ['전체', ...CATEGORIES];
-  $('chips').innerHTML = cats.map(c =>
-    `<button class="chip ${activeFilter === c ? 'active' : ''}" data-cat="${c}">${c}</button>`
-  ).join('');
-  $('chips').querySelectorAll('.chip').forEach(btn => {
-    btn.addEventListener('click', () => { activeFilter = btn.dataset.cat; renderChips(); renderList(); });
-  });
-}
-
 function renderList() {
   let filtered = memos;
-  if (activeFilter !== '전체') filtered = filtered.filter(m => m.category === activeFilter);
   if (searchTerm) {
     const t = searchTerm.toLowerCase();
     filtered = filtered.filter(m => (m.title || '').toLowerCase().includes(t) || (m.content || '').toLowerCase().includes(t));
@@ -502,25 +445,17 @@ function renderList() {
     return;
   }
 
-  const canReorder = activeFilter === '전체' && !searchTerm;
+  const canReorder = !searchTerm;
   const handleSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="6" r="1.6"/><circle cx="16" cy="6" r="1.6"/><circle cx="8" cy="12" r="1.6"/><circle cx="16" cy="12" r="1.6"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>`;
 
   $('list').innerHTML = filtered.map(m => `
-    <div class="memo ${m.completed ? 'completed' : ''}" data-id="${m.id}">
-      <div class="checkWrap">
-        <div class="checkbox ${m.completed ? 'checked' : ''}" data-action="check" data-id="${m.id}">
-          ${m.completed ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>' : ''}
-        </div>
-      </div>
+    <div class="memo" data-id="${m.id}" style="background:${m.color || COLORS[0]}">
       <div class="memoBody">
         <div class="memoTop">
           <p class="memoTitle">${escapeHtml(m.title || '(제목 없음)')}</p>
           <span class="memoDate mono">${formatDate(m.created_at)}</span>
         </div>
         <p class="memoPreview">${escapeHtml(m.content || '')}</p>
-        <div class="memoMeta">
-          <span class="catTag">${m.category || '일반'}</span>
-        </div>
       </div>
       ${canReorder ? `<div class="dragHandle" data-action="drag">${handleSvg}</div>` : ''}
     </div>
@@ -533,9 +468,6 @@ function renderList() {
     });
     const handle = el.querySelector('.dragHandle');
     if (handle) attachDrag(handle, el);
-  });
-  $('list').querySelectorAll('[data-action="check"]').forEach(el => {
-    el.addEventListener('click', (ev) => toggleComplete(memos.find(m => m.id === el.dataset.id), ev));
   });
 }
 
@@ -617,12 +549,12 @@ function formatDate(d) {
 }
 
 // ---------- Sheet ----------
-function renderCatRow() {
-  $('catRow').innerHTML = CATEGORIES.map(c =>
-    `<button type="button" class="catPick ${selectedCategory === c ? 'active' : ''}" data-cat="${c}">${c}</button>`
+function renderColorRow() {
+  $('colorRow').innerHTML = COLORS.map(c =>
+    `<button type="button" class="colorPick ${selectedColor === c ? 'active' : ''}" data-color="${c}" style="background:${c}"></button>`
   ).join('');
-  $('catRow').querySelectorAll('.catPick').forEach(btn => {
-    btn.addEventListener('click', () => { selectedCategory = btn.dataset.cat; renderCatRow(); });
+  $('colorRow').querySelectorAll('.colorPick').forEach(btn => {
+    btn.addEventListener('click', () => { selectedColor = btn.dataset.color; renderColorRow(); });
   });
 }
 
@@ -631,9 +563,9 @@ function openSheet(memo) {
   $('sheetTitle').textContent = memo ? '메모 수정' : '새 메모';
   $('titleInput').value = memo ? memo.title : '';
   $('contentInput').value = memo ? memo.content : '';
-  selectedCategory = memo ? (memo.category || CATEGORIES[0]) : CATEGORIES[0];
+  selectedColor = memo ? (memo.color || COLORS[0]) : COLORS[0];
   $('deleteBtn').style.display = memo ? 'block' : 'none';
-  renderCatRow();
+  renderColorRow();
   updateTitlePlaceholder();
   $('overlay').classList.add('show');
   setTimeout(() => $('contentInput').focus(), 100);
