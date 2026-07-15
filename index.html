@@ -284,13 +284,15 @@
   <div id="sheet">
     <div class="sheetHead">
       <h2 id="sheetTitle">새 메모</h2>
-      <button class="iconBtn" id="closeSheetBtn">닫기</button>
+      <div style="display:flex; align-items:center; gap:4px;">
+        <button class="iconBtn" id="deleteBtn" style="display:none; color:var(--danger);">삭제</button>
+        <button class="iconBtn" id="closeSheetBtn">닫기</button>
+      </div>
     </div>
     <input id="titleInput" placeholder="제목" />
     <textarea id="contentInput" placeholder="내용을 입력하세요..."></textarea>
     <div class="colorRow" id="colorRow"></div>
     <div class="sheetActions">
-      <button class="btn btnDanger" id="deleteBtn" style="display:none;">삭제</button>
       <button class="btn" id="saveBtn">저장</button>
     </div>
   </div>
@@ -427,6 +429,7 @@ async function saveMemo() {
 
 async function deleteMemo() {
   if (!editingId) return;
+  if (!confirm('이 메모를 삭제할까요? 삭제하면 되돌릴 수 없어요.')) return;
   await supabase.from('memos').delete().eq('id', editingId);
   closeSheet();
   loadMemos();
