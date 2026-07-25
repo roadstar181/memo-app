@@ -420,7 +420,7 @@ async function saveMemo() {
   } else {
     await supabase.from('memos').insert({
       title, content, color: selectedColor,
-      user_id: currentUser.id, position: Date.now()
+      user_id: currentUser.id, position: -Date.now()
     });
   }
   closeSheet();
