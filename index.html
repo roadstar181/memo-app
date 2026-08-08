@@ -167,12 +167,14 @@
   .memoTitle{
     font-size:15px; font-weight:600; margin:0;
     letter-spacing:-0.01em;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
   .memoDate{
     flex:none;
     font-size:11px;
     color:rgba(36,35,31,0.55);
     padding-top:2px;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
   .memoPreview{
     font-size:13px; color:rgba(36,35,31,0.7);
@@ -182,6 +184,7 @@
     -webkit-line-clamp:3;
     -webkit-box-orient:vertical;
     line-height:1.5;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
 
   /* ---------- FAB ---------- */
@@ -630,6 +633,8 @@ function attachLongPress(el) {
     timer = setTimeout(() => {
       timer = null;
       suppressNextClick = true;
+      const sel = window.getSelection && window.getSelection();
+      if (sel) sel.removeAllRanges();
       if (navigator.vibrate) { try { navigator.vibrate(12); } catch(e) {} }
       openActionSheet(memos.find(m => m.id === el.dataset.id));
     }, DURATION);
@@ -642,6 +647,7 @@ function attachLongPress(el) {
   el.addEventListener('pointerleave', cancel);
   el.addEventListener('pointercancel', cancel);
   el.addEventListener('contextmenu', (ev) => ev.preventDefault());
+  el.addEventListener('selectstart', (ev) => ev.preventDefault());
 }
 
 function memoText(memo) {
