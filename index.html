@@ -416,6 +416,7 @@ let channel = null;
 let suppressNextClick = false;
 let actionMemo = null;
 let toastTimer = null;
+let sheetHistoryPushed = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -509,10 +510,13 @@ async function loadMemos() {
   renderList();
 }
 
-async function saveMemo() {
+async function saveMemo(fromBack) {
   const content = $('contentInput').value.trim();
   const title = $('titleInput').value.trim() || deriveTitle(content);
-  if (!title && !content) return;
+  if (!title && !content) {
+    if (fromBack) closeSheet(true);
+    return;
+  }
 
   if (editingId) {
     await supabase.from('memos').update({
@@ -524,7 +528,7 @@ async function saveMemo() {
       user_id: currentUser.id, position: -Date.now()
     });
   }
-  closeSheet();
+  closeSheet(fromBack === true);
   loadMemos();
 }
 
@@ -759,18 +763,31 @@ function openSheet(memo) {
   renderColorRow();
   updateTitlePlaceholder();
   $('overlay').classList.add('show');
+  history.pushState({ memoSheet: true }, '');
+  sheetHistoryPushed = true;
   setTimeout(() => $('contentInput').focus(), 100);
 }
 
-function closeSheet() {
+function closeSheet(skipHistoryBack) {
   $('overlay').classList.remove('show');
   editingId = null;
+  if (!skipHistoryBack && sheetHistoryPushed) {
+    sheetHistoryPushed = false;
+    history.back();
+  }
 }
 
+window.addEventListener('popstate', () => {
+  if ($('overlay').classList.contains('show')) {
+    sheetHistoryPushed = false;
+    saveMemo(true);
+  }
+});
+
 $('fab').addEventListener('click', () => openSheet(null));
-$('closeSheetBtn').addEventListener('click', closeSheet);
+$('closeSheetBtn').addEventListener('click', () => closeSheet());
 $('overlay').addEventListener('click', (e) => { if (e.target.id === 'overlay') closeSheet(); });
-$('saveBtn').addEventListener('click', saveMemo);
+$('saveBtn').addEventListener('click', () => saveMemo());
 $('deleteBtn').addEventListener('click', deleteMemo);
 $('searchInput').addEventListener('input', (e) => { searchTerm = e.target.value; renderList(); });
 $('contentInput').addEventListener('input', updateTitlePlaceholder);
